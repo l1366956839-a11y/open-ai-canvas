@@ -226,12 +226,14 @@ func (c *taskTerminalCoordinator) markTerminalState(task *model.Task) error {
 	if err != nil {
 		return fmt.Errorf("写入任务终态失败：%w", err)
 	}
-	// CAS 未命中：数据库里任务已不再是 running（可能被另一 worker 置成 succeeded/
-	// failed/cancelled，或并发取消已先行落地）。此分支不要再按本任务内存快照重复
-	// 计费/收尾，交由调用方判断是否读取数据库当前态；这里至少落一条可观测日志，
-	// 避免「上游成功/失败但终态被并发覆盖」时静默无痕。
+	// CAS 未命中：数据库里任务已不再是本 worker 租约下的 running（可能被另一 worker
+	// 置成 succeeded/failed/cancelled，或并发取消已先行落地）。此分支不执行任何计费/
+	// 收尾副作用（避免 stale worker 重复退款或覆盖终态），并把冲突上抛交由调用方按
+	// 租约 fencing 语义处理；同时落一条可观测日志，避免「上游成功/失败但终态被并发
+	// 覆盖」时静默无痕。
 	if !updated {
 		_ = c.logger.log(task.UserID, task.ID, "warn", "任务终态写入被跳过（状态已非 running，疑似被并发收尾覆盖）", task.ID+" "+string(task.Status))
+		return repository.ErrTaskStateConflict
 	}
 	return nil
 }
