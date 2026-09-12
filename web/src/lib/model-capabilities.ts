@@ -1,5 +1,6 @@
 import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols";
 import type { ImageResolutionOption, ImageResolutionTier } from "@/lib/image-resolution-tiers";
+import { imagePresetForRatio } from "@/lib/image-size-presets";
 
 export type ModelCapabilityConfig = {
     version: number;
@@ -980,12 +981,12 @@ function matchWorkflowValue(value: string, options: string[]) {
 }
 
 export function normalizeImageValue(profile: ImageCapabilityConfig, value: { size?: string; quality?: string; count?: string; transparentBackground?: string }) {
-    const size = normalizeImageSizeSetting(profile, value.size);
     const requestedQuality = String(value.quality || "").trim().toLowerCase();
     // 比例协议的固定分辨率预设没有独立 quality 字段时，UI 仍需把当前比例对应的
     // 预设档位带入请求。仅在 quality 未声明支持时启用，避免与 auto/low/medium/high
     // 这组真实图片质量语义混用。
-    const presetTier = !profile.quality.supported ? imagePresetTierForSelection(profile, size) : undefined;
+    const sizeForTier = normalizeImageSizeSetting(profile, value.size);
+    const presetTier = !profile.quality.supported ? imagePresetTierForSelection(profile, sizeForTier) : undefined;
     const quality = profile.quality.supported
         ? requestedQuality === "auto" || requestedQuality === "any"
             ? "auto"
@@ -995,6 +996,7 @@ export function normalizeImageValue(profile: ImageCapabilityConfig, value: { siz
         : requestedQuality === "1k" || requestedQuality === "2k" || requestedQuality === "4k"
             ? requestedQuality
             : presetTier || profile.quality.default || "auto";
+    const size = normalizeImageSizeSetting(profile, value.size, quality);
     const count = String(Math.max(1, Math.min(profile.maxOutputs, Math.floor(Math.abs(Number(value.count)) || 1))));
     const transparentBackground = profile.transparentBackground.supported && value.transparentBackground === "true" ? "true" : "false";
     return { size, quality, count, transparentBackground };
@@ -1005,17 +1007,44 @@ function imagePresetTierForSelection(profile: ImageCapabilityConfig, size: strin
     return profile.size.presets?.find((preset) => preset.ratio === size)?.tier;
 }
 
-export function normalizeImageSizeSetting(profile: ImageCapabilityConfig, value?: string) {
+function imageTierForQuality(quality?: string): ImageResolutionTier {
+    const value = (quality || "").trim().toLowerCase();
+    if (value === "medium" || value === "2k" || value === "hd") return "2k";
+    if (value === "high" || value === "4k") return "4k";
+    return "1k";
+}
+
+/**
+ * size 协议要求像素值（如 1824x1024），但历史状态里可能残留比例（如 16:9）。
+ * 换渠道/换模型后若沿用旧值，会被后端判为非法尺寸，这里统一换算成像素。
+ */
+function imagePixelSizeForRatio(profile: ImageCapabilityConfig, ratio: string, quality?: string): string | undefined {
+    const tier = imageTierForQuality(quality);
+    const preset = profile.size.presets?.find((item) => item.ratio === ratio && item.tier === tier) || profile.size.presets?.find((item) => item.ratio === ratio);
+    if (preset?.size) return preset.size;
+    try {
+        return imagePresetForRatio(tier, ratio).size;
+    } catch {
+        return undefined;
+    }
+}
+
+export function normalizeImageSizeSetting(profile: ImageCapabilityConfig, value?: string, quality?: string) {
     if (profile.size.parameter === "none") return "auto";
     const candidate = value?.trim() || profile.size.default;
-    if (profile.size.allowCustom || profile.size.values.includes(candidate)) return candidate;
+    if (profile.size.values.includes(candidate)) return candidate;
+    if (profile.size.parameter === "size" && candidate.includes(":")) {
+        const resolved = imagePixelSizeForRatio(profile, candidate, quality);
+        if (resolved) return resolved;
+    }
+    if (profile.size.allowCustom) return candidate;
     return profile.size.default || profile.size.values[0] || "auto";
 }
 
-export function imageSizeRequest(profile: ImageCapabilityConfig, value?: string) {
+export function imageSizeRequest(profile: ImageCapabilityConfig, value?: string, quality?: string) {
     const parameter = profile.size.parameter;
     if (parameter === "none") return undefined;
-    const normalized = normalizeImageSizeSetting(profile, value);
+    const normalized = normalizeImageSizeSetting(profile, value, quality);
     if (!normalized || normalized === "auto") return undefined;
     return { parameter, value: normalized };
 }

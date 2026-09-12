@@ -900,7 +900,7 @@ func validateImageTask(profile *ImageCapabilityConfig, input canvasGenerationInp
 	}
 	if profile.Size.Parameter == "size" && profile.Size.AllowCustom && strings.HasPrefix(modelName, "gpt-image-2") && !containsCapabilityString(profile.Size.Values, input.Config.Size) {
 		if err := validateGPTImage2CustomSize(input.Config.Size); err != nil {
-			return BadAuthRequest(err.Error())
+			return BadAuthRequest(imageCustomSizeError(err.Error(), input.Config.Size, profile.Size.Values))
 		}
 	}
 	quality := strings.TrimSpace(input.Config.Quality)
@@ -1000,6 +1000,20 @@ func validateGPTImage2CustomSize(value string) error {
 		return errors.New("图片总像素需在 655360 到 8294400 之间")
 	}
 	return nil
+}
+
+// imageCustomSizeError 在自定义尺寸校验失败时补上实际提交值与可用尺寸，
+// 便于定位「换渠道后旧尺寸残留 / 能力列表与实际提交值不一致」这类问题。
+func imageCustomSizeError(reason string, value string, supported []string) string {
+	shown := strings.TrimSpace(value)
+	if shown == "" {
+		shown = "空"
+	}
+	message := fmt.Sprintf("%s（当前提交的尺寸为 %s）", reason, shown)
+	if len(supported) > 0 && len(supported) <= 12 {
+		message += fmt.Sprintf("，当前模型支持的尺寸：%s", strings.Join(supported, "、"))
+	}
+	return message
 }
 
 func videoDurationAllowed(value VideoDurationConfig, seconds int) bool {

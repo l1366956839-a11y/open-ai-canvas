@@ -113,7 +113,7 @@ function dimensionGCD(left: number, right: number) {
 }
 
 export function resolveImageRequestSize(profile: ImageCapabilityConfig, quality: string | undefined, size: string) {
-    const request = imageSizeRequest(profile, size);
+    const request = imageSizeRequest(profile, size, quality);
     if (!request) return undefined;
     if (request.parameter === "aspect_ratio" && !profile.size.allowCustom && profile.size.presets?.length) {
         const normalized = normalizeQuality(quality || profile.quality.default);
