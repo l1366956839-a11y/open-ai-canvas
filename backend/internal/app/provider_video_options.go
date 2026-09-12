@@ -12,9 +12,17 @@ func isPublicMediaURL(value string) bool {
 	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
 }
 
+// isSeedanceModelName 只判断模型名是否属于 Seedance 系列，不含 BaseURL 判定。
+// 需要判断「是否走 Seedance 协议实现」时用 isSeedanceVideoConfig；
+// 只关心模型名归属（如计费日志的默认时长兜底）时用这个函数，避免各处重复写
+// 模型名匹配而与实际协议判定脱节。
+func isSeedanceModelName(model string) bool {
+	name := strings.ToLower(strings.TrimSpace(model))
+	return strings.Contains(name, "seedance") || strings.Contains(name, "doubao-seedance")
+}
+
 func isSeedanceVideoConfig(config providerConfig) bool {
-	model := strings.ToLower(config.Model)
-	return strings.Contains(model, "seedance") || strings.Contains(model, "doubao-seedance") || isArkPlanVideoConfig(config)
+	return isSeedanceModelName(config.Model) || isArkPlanVideoConfig(config)
 }
 
 func isGrokVideoConfig(config providerConfig) bool {
