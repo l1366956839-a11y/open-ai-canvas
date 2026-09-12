@@ -169,7 +169,9 @@ func (s *Service) runWorkerTask(fn func()) bool {
 
 func channelModelNames(channel model.ModelChannel) []string {
 	models := []string{}
-	_ = json.Unmarshal([]byte(channel.ModelsJSON), &models)
+	if err := json.Unmarshal([]byte(channel.ModelsJSON), &models); err != nil {
+		kernel.LogJSONDecodeFailure("app.channel.ModelsJSON", err, channel.ModelsJSON)
+	}
 	return uniqueNonEmpty(models)
 }
 

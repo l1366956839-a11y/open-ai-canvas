@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -73,6 +74,17 @@ func TruncateRunes(value string, limit int) string {
 		return value
 	}
 	return string(runes[:limit]) + "..."
+}
+
+// LogJSONDecodeFailure 记录持久化 JSON 字段解析失败。
+// 这些字段解析失败后调用方通常继续用零值往下走，没有日志就无法定位是哪条记录、
+// 哪个字段的数据损坏，表现为「功能莫名不对」却查不到原因。
+// 空的原始值代表字段尚未写入，是正常状态，不记录以免刷日志。
+func LogJSONDecodeFailure(scope string, err error, raw string) {
+	if strings.TrimSpace(raw) == "" {
+		return
+	}
+	log.Printf("%s: JSON 解析失败，已按零值继续：err=%v, raw=%s", scope, err, TruncateRunes(raw, 200))
 }
 
 // Megabytes 转换 MB 到字节。

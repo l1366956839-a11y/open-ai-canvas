@@ -1,6 +1,7 @@
 package model
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"encoding/json"
 	"strings"
 )
@@ -29,6 +30,8 @@ func DecodeSKUSelector(raw string) map[string]string {
 	if strings.TrimSpace(raw) == "" {
 		return selector
 	}
-	_ = json.Unmarshal([]byte(raw), &selector)
+	if err := json.Unmarshal([]byte(raw), &selector); err != nil {
+		kernel.LogJSONDecodeFailure("model.DecodeSKUSelector", err, raw)
+	}
 	return selector
 }

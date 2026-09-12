@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -87,12 +88,16 @@ func creationHash(value any) string {
 }
 func creationRunOutput(run model.CreationRun) CreationRunOutput {
 	state := map[string]any{}
-	_ = json.Unmarshal([]byte(run.StateJSON), &state)
+	if err := json.Unmarshal([]byte(run.StateJSON), &state); err != nil {
+		kernel.LogJSONDecodeFailure("app.run.StateJSON", err, run.StateJSON)
+	}
 	return CreationRunOutput{run, state}
 }
 func creationSubmissionOutput(item model.CreationSubmission) CreationSubmissionOutput {
 	var quote CreationQuote
-	_ = json.Unmarshal([]byte(item.QuoteJSON), &quote)
+	if err := json.Unmarshal([]byte(item.QuoteJSON), &quote); err != nil {
+		kernel.LogJSONDecodeFailure("app.item.QuoteJSON", err, item.QuoteJSON)
+	}
 	return CreationSubmissionOutput{item, quote}
 }
 func validateCreationGuard(run *model.CreationRun, guard CreationGuard) error {
@@ -415,7 +420,9 @@ func (s *Service) prepareCreationTask(userID string, req CreateTaskRequest) (*mo
 		return nil, nil, "", err
 	}
 	var input map[string]any
-	_ = json.Unmarshal([]byte(task.InputJSON), &input)
+	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
+		kernel.LogJSONDecodeFailure("app.task.InputJSON", err, task.InputJSON)
+	}
 	resolved, _ := input["config"].(map[string]any)
 	for _, key := range []string{"size", "videoSeconds", "vquality", "quality", "count"} {
 		if requested := stringValue(config[key]); requested != "" && !strings.EqualFold(requested, stringValue(resolved[key])) {
@@ -457,7 +464,9 @@ func creationQuoteFor(task *model.Task, order *model.BillingOrder, signature str
 		quote.Estimated = order.BillingMode == "token"
 	}
 	var input map[string]any
-	_ = json.Unmarshal([]byte(task.InputJSON), &input)
+	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
+		kernel.LogJSONDecodeFailure("app.task.InputJSON", err, task.InputJSON)
+	}
 	config, _ := input["config"].(map[string]any)
 	quote.Options = map[string]any{}
 	for _, key := range []string{"size", "videoSeconds", "vquality", "quality", "maxTokens"} {
@@ -485,7 +494,9 @@ func validateCreationSubmissionScope(run *model.CreationRun, version int64, req 
 		return creationConflict("请先确认当前方案")
 	}
 	var ops []CreationCanvasOp
-	_ = json.Unmarshal([]byte(run.ApprovedOperationsJSON), &ops)
+	if err := json.Unmarshal([]byte(run.ApprovedOperationsJSON), &ops); err != nil {
+		kernel.LogJSONDecodeFailure("app.run.ApprovedOperationsJSON", err, run.ApprovedOperationsJSON)
+	}
 	nodeID := stringValue(req.Input["nodeId"])
 	metadata, _ := req.Input["metadata"].(map[string]any)
 	if nodeID == "" {
@@ -740,7 +751,9 @@ func (s *Service) ApproveCreationSubmissions(userID, id string, req CreationRequ
 			return nil, creationError(err)
 		}
 		var request CreateTaskRequest
-		_ = json.Unmarshal([]byte(item.RequestJSON), &request)
+		if err := json.Unmarshal([]byte(item.RequestJSON), &request); err != nil {
+			kernel.LogJSONDecodeFailure("app.item.RequestJSON", err, item.RequestJSON)
+		}
 		task, order, sig, err := s.prepareCreationTask(userID, request)
 		if err != nil {
 			return nil, err
@@ -766,7 +779,9 @@ func (s *Service) ApproveCreationSubmissions(userID, id string, req CreationRequ
 				return creationConflict("报价已过期或撤销")
 			}
 			var request CreateTaskRequest
-			_ = json.Unmarshal([]byte(item.RequestJSON), &request)
+			if err := json.Unmarshal([]byte(item.RequestJSON), &request); err != nil {
+				kernel.LogJSONDecodeFailure("app.item.RequestJSON", err, item.RequestJSON)
+			}
 			if e = validateCreationSubmissionScope(run, item.ProposalVersion, request); e != nil {
 				return e
 			}
@@ -790,7 +805,9 @@ func (s *Service) ApproveCreationSubmissions(userID, id string, req CreationRequ
 }
 func checkCreationPriceSignature(repo *repository.Repository, task *model.Task, want string) error {
 	var input map[string]any
-	_ = json.Unmarshal([]byte(task.InputJSON), &input)
+	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
+		kernel.LogJSONDecodeFailure("app.task.InputJSON", err, task.InputJSON)
+	}
 	config, _ := input["config"].(map[string]any)
 	got, err := repo.CreationPriceSignature(task, stringValue(config["channelId"]), stringValue(config["model"]))
 	if err != nil {
@@ -835,7 +852,9 @@ func (s *Service) ExecuteCreationSubmission(userID, id string, req CreationReque
 		return nil, creationConflict("报价已变化，请重新确认")
 	}
 	var input map[string]any
-	_ = json.Unmarshal([]byte(task.InputJSON), &input)
+	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
+		kernel.LogJSONDecodeFailure("app.task.InputJSON", err, task.InputJSON)
+	}
 	if err = s.protectTaskSecrets(input); err != nil {
 		return nil, err
 	}

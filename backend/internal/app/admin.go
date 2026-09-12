@@ -858,7 +858,9 @@ func publicChannel(channel model.ModelChannel, admin bool, channelModels []model
 		}
 	}
 	if len(models) == 0 {
-		_ = json.Unmarshal([]byte(channel.ModelsJSON), &models)
+		if err := json.Unmarshal([]byte(channel.ModelsJSON), &models); err != nil {
+			kernel.LogJSONDecodeFailure("app.channel.ModelsJSON", err, channel.ModelsJSON)
+		}
 	}
 	apiKey := ""
 	baseURL := channel.BaseURL
