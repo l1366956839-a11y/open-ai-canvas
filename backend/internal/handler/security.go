@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -270,7 +271,9 @@ func normalizedProxyPath(value string) (string, error) {
 func channelAllowsModel(channel *model.ModelChannel, requested string) bool {
 	requested = strings.TrimPrefix(strings.TrimSpace(requested), "models/")
 	var models []string
-	_ = json.Unmarshal([]byte(channel.ModelsJSON), &models)
+	if err := json.Unmarshal([]byte(channel.ModelsJSON), &models); err != nil {
+		kernel.LogJSONDecodeFailure("handler.channel.ModelsJSON", err, channel.ModelsJSON)
+	}
 	for _, configured := range models {
 		if strings.TrimPrefix(strings.TrimSpace(configured), "models/") == requested {
 			return true

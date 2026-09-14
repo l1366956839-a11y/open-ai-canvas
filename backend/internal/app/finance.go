@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -751,7 +752,9 @@ func arkVideoOutputPixels(resolution string, ratio string, modelName string) int
 
 func estimateProxyTokens(body []byte) tokenBillingEstimate {
 	var payload map[string]any
-	_ = json.Unmarshal(body, &payload)
+	if err := json.Unmarshal(body, &payload); err != nil {
+		kernel.LogJSONDecodeFailure("finance.tokenBillingEstimateResponse", err, string(body))
+	}
 	return tokenBillingEstimate{InputTokens: estimatedTokens(body), OutputTokens: maxOutputTokens(payload)}
 }
 

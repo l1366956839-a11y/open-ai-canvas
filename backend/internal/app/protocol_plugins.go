@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -674,7 +675,9 @@ func (c *pluginRuntime) setEnabled(id string, enabled bool) (PluginView, error) 
 
 func pluginManifestView(raw []byte, metadata protocol.Metadata, source string) PluginManifestView {
 	var manifest protocol.Manifest
-	_ = json.Unmarshal(raw, &manifest)
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		kernel.LogJSONDecodeFailure("protocol_plugins.pluginManifest", err, string(raw))
+	}
 	if manifest.Metadata.ID == "" {
 		manifest.Metadata = metadata
 	}

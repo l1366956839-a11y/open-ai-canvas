@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -571,7 +572,9 @@ func characterAssetPayload(assetID string, versionID string, name string, defini
 
 func voiceProfileSummary(profile model.VoiceProfile) VoiceProfileSummary {
 	compatible := []string{}
-	_ = json.Unmarshal([]byte(profile.CompatibleModelsJSON), &compatible)
+	if err := json.Unmarshal([]byte(profile.CompatibleModelsJSON), &compatible); err != nil {
+		kernel.LogJSONDecodeFailure("app.profile.CompatibleModelsJSON", err, profile.CompatibleModelsJSON)
+	}
 	return VoiceProfileSummary{ID: profile.ID, Name: profile.Name, Provider: profile.Provider, VoiceKey: profile.VoiceKey, Language: profile.Language, Timbre: profile.Timbre, SampleResourceID: profile.SampleResourceID, CompatibleModels: compatible, Status: profile.Status}
 }
 

@@ -35,7 +35,11 @@ export function generationErrorMessage(error: unknown) {
         if (hasHttpStatus(raw, 429)) return "服务当前繁忙，请稍后重试。";
         if (hasHttpStatus(raw, 401, 403)) return "生成服务鉴权失败，请检查渠道配置。";
         if (hasHttpStatus(raw, 404)) return "生成服务地址不可用，请检查渠道配置。";
-        if (hasHttpStatus(raw, 500, 502, 503, 504) || containsInfrastructureDetails(raw)) return NETWORK_ERROR_MESSAGE;
+        // 上游 5xx 是服务端错误，不是本机网络问题；提示必须指向渠道与模型名，
+        // 否则用户会误以为是自己网络不好（例如中转站不认模型名时返回 502）。
+        const serverError = httpStatusIn(raw, 500, 502, 503, 504);
+        if (serverError) return upstreamUnavailableMessage(serverError);
+        if (containsInfrastructureDetails(raw)) return NETWORK_ERROR_MESSAGE;
     }
     return displayMessage || DEFAULT_GENERATION_ERROR_MESSAGE;
 }
@@ -119,6 +123,14 @@ function isNetworkFailure(value: string) {
 
 function hasHttpStatus(value: string, ...statuses: number[]) {
     return statuses.some((status) => new RegExp(`\\b${status}\\b`).test(value));
+}
+
+function httpStatusIn(value: string, ...statuses: number[]) {
+    return statuses.find((status) => new RegExp(`\\b${status}\\b`).test(value));
+}
+
+function upstreamUnavailableMessage(status: number) {
+    return `模型服务暂时不可用（HTTP ${status}）。请确认渠道支持该模型，或稍后重试。`;
 }
 
 function containsInfrastructureDetails(value: string) {

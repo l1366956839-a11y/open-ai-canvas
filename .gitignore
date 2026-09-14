@@ -36,6 +36,7 @@ coverage/
 dist/
 *.log
 *.tsbuildinfo
+/backend/server.exe
 *.db
 *.db-*
 *.sqlite
@@ -65,3 +66,7 @@ camera_language_guide.md
 
 # Local backend executable; never commit build output.
 backend/cmd/server/server
+/.workbuddy/
+
+# 本机一键启动脚本：含个人工具链绝对路径，不入库
+/start-dev.sh

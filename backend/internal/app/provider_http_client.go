@@ -395,7 +395,7 @@ func recordProviderRequest(req *http.Request, startedAt time.Time, statusCode in
 	if requestKind == "create" && metadata.Capability == "video" {
 		callLog.VideoSeconds = metadata.VideoSeconds
 		if callLog.VideoSeconds <= 0 {
-			if strings.Contains(strings.ToLower(metadata.Model), "seedance") || strings.Contains(req.URL.Path, "/contents/generations/tasks") {
+			if isSeedanceModelName(metadata.Model) || strings.Contains(req.URL.Path, "/contents/generations/tasks") {
 				callLog.VideoSeconds = 5
 			} else {
 				callLog.VideoSeconds = 6

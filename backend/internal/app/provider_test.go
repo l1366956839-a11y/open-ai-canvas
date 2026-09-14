@@ -2021,6 +2021,33 @@ func TestArkPlanConfigStaysSeparateFromSeedanceVideosEndpoint(t *testing.T) {
 	}
 }
 
+// 两个判定的边界：isSeedanceModelName 只看模型名，isSeedanceVideoConfig 还包含
+// BaseURL 判定。计费日志等只关心模型名归属的地方必须用前者，否则会与协议判定
+// 再次出现两份互不一致的实现。
+func TestSeedanceModelNameAndVideoConfigBoundaries(t *testing.T) {
+	tests := []struct {
+		name       string
+		config     providerConfig
+		wantModel  bool
+		wantConfig bool
+	}{
+		{"模型名命中", providerConfig{Model: "seedance-2.0-pro"}, true, true},
+		{"模型名带大小写与空格", providerConfig{Model: "  Doubao-Seedance-1.5 "}, true, true},
+		{"仅 BaseURL 命中方舟计划", providerConfig{BaseURL: "https://ark.example.com/api/plan/v3", Model: "doubao-video"}, false, true},
+		{"两者都不命中", providerConfig{BaseURL: "https://api.example.com", Model: "kling-v2"}, false, false},
+	}
+	for _, item := range tests {
+		t.Run(item.name, func(t *testing.T) {
+			if got := isSeedanceModelName(item.config.Model); got != item.wantModel {
+				t.Fatalf("isSeedanceModelName(%q) = %v, want %v", item.config.Model, got, item.wantModel)
+			}
+			if got := isSeedanceVideoConfig(item.config); got != item.wantConfig {
+				t.Fatalf("isSeedanceVideoConfig(%+v) = %v, want %v", item.config, got, item.wantConfig)
+			}
+		})
+	}
+}
+
 func TestVolcengineArkVideoProtocolUsesContentTaskAndDownloadsResult(t *testing.T) {
 	t.Setenv("CANVAS_ALLOW_PRIVATE_UPSTREAMS", "true")
 	paths := make([]string, 0, 3)

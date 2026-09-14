@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- 图片尺寸归一化：换渠道或换模型后，历史状态里残留的比例值（如 `16:9`）会在提交前换算成对应档位的像素值（如 `1824x1024`），不再被判为非法尺寸；`aspect_ratio` 协议的比例值保持原样。
+- 图片生成失败提示：上游返回 5xx 时明确提示「模型服务暂时不可用（HTTP xxx）。请确认渠道支持该模型，或稍后重试。」，不再笼统报「网络异常」；真实网络故障（连接被拒、超时等）仍报网络异常。
+- 自定义尺寸校验失败时，提示中附带当前实际提交的尺寸值，便于定位渠道能力与实际提交值不一致的问题。
+- 依赖安全升级：`react-router` 升至 8.3.1（修复 RSC 模式 CSRF 绕过）、`@tiptap` 全系列升至 3.31.3（修复 Markdown 解析 ReDoS 与原型污染）、`shadcn` 升至 4.21.0、`sharp` 升至 0.35.4（修复 libvips 与 libheif 漏洞）；放宽被 `overrides` 锁住的 `hono`、`qs`、`js-yaml` 到已修复版本；后端 `golang.org/x/crypto` 升至 v0.57.0（修复 ssh 相关的三个 CVE）；移除全仓未使用的 `mammoth`，连带消除 `@xmldom/xmldom` 的 9 条告警。
+
 ## v1.2.9
 
 - 发布正式版本 `v1.2.9`，提供 `ghcr.io/ddcat-ai/open-ai-canvas-web:1.2.9` 与 `ghcr.io/ddcat-ai/open-ai-canvas-backend:1.2.9` 的 Linux amd64/arm64 镜像，并更新 `latest` 镜像。

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // Bun 直接执行 TypeScript 测试时需要保留扩展名；生产 tsconfig 不包含 test/。
-import { defaultModelCapabilityConfig, modelCapabilityConfigFor, normalizeVideoValue } from "../src/lib/model-capabilities.ts";
+import { defaultModelCapabilityConfig, modelCapabilityConfigFor, imageSizeRequest, normalizeImageSizeSetting, normalizeVideoValue } from "../src/lib/model-capabilities.ts";
 
 test("switching to MiniMax H3 replaces an unsupported 720p value with 768P", () => {
     const profile = defaultModelCapabilityConfig("minimax-video", "MiniMax-H3").video!;
@@ -216,4 +216,32 @@ test("non-H3 relay models keep the generic 1000-char prompt limit", () => {
     ).video!;
 
     assert.equal(profile.references.promptMaxChars, 1000);
+});
+
+test("size 协议下残留的比例尺寸换算成像素，避免换渠道后被判为非法尺寸", () => {
+    const profile = defaultModelCapabilityConfig("openai-image", "gpt-image-2.5-sunburst").image!;
+    // 渠道能力只声明像素值时，历史状态里残留的 16:9 必须换算，否则后端会拒绝。
+    profile.size = { parameter: "size", values: ["1024x1024", "1824x1024"], default: "1024x1024", allowCustom: true };
+
+    assert.equal(normalizeImageSizeSetting(profile, "16:9"), "1824x1024");
+    assert.equal(imageSizeRequest(profile, "16:9")?.value, "1824x1024");
+    // 已经声明过的像素值不受影响；自定义像素仍按 allowCustom 原样保留。
+    assert.equal(normalizeImageSizeSetting(profile, "1024x1024"), "1024x1024");
+    assert.equal(normalizeImageSizeSetting(profile, "1808x1008"), "1808x1008");
+});
+
+test("残留比例按质量档位换算，high 落到 4K 像素", () => {
+    const profile = defaultModelCapabilityConfig("openai-image", "gpt-image-2").image!;
+    profile.size = { parameter: "size", values: ["1024x1024"], default: "1024x1024", allowCustom: true };
+
+    assert.equal(normalizeImageSizeSetting(profile, "16:9", "high"), "3840x2160");
+    assert.equal(normalizeImageSizeSetting(profile, "16:9", "medium"), "2752x1536");
+});
+
+test("aspect_ratio 协议的比例值不做像素换算", () => {
+    const profile = defaultModelCapabilityConfig("openai-image", "gpt-image-2").image!;
+    profile.size = { parameter: "aspect_ratio", values: ["1:1", "16:9"], default: "1:1", allowCustom: false };
+
+    assert.equal(normalizeImageSizeSetting(profile, "16:9"), "16:9");
+    assert.equal(imageSizeRequest(profile, "16:9")?.value, "16:9");
 });

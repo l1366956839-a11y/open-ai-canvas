@@ -7,7 +7,8 @@ import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { EmptyState } from "@/components/ui/product/empty-state";
 import { StatusBadge } from "@/components/ui/base/badges";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
-import { Box, ChevronDown, ChevronLeft, ChevronRight, Download, Film, Image as ImageIcon, Layers3, List, Maximize2, Play, Plus, RefreshCcw, Save, Search, SlidersHorizontal, Trash2, UsersRound, WandSparkles, X } from "lucide-react";
+import { Tooltip } from "@/components/ui/base/tooltip";
+import { Box, ChevronDown, ChevronLeft, ChevronRight, Download, Film, Image as ImageIcon, Layers3, List, Maximize2, Play, Plus, RefreshCcw, RefreshCw, Save, Search, SlidersHorizontal, Trash2, UsersRound, WandSparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
 import { CanvasResourceMentionTextarea } from "@/components/canvas/canvas-resource-mention-textarea";
@@ -21,7 +22,8 @@ import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBoole
 import { formatVideoResolutionLabel } from "@/lib/video-generation-options";
 import { submitBackendGenerationTask } from "@/services/api/generation-task";
 import { quoteLogicalModel } from "@/services/api/logical-models";
-import { type GenerationTask } from "@/services/api/task-center";
+import { queryFailedVideoProviderTask, type GenerationTask } from "@/services/api/task-center";
+import { generationErrorMessage } from "@/lib/generation-error";
 import {
     createUnitWorkflow,
     deleteProjectShot,
@@ -389,6 +391,29 @@ export default function WorkflowProductionWorkbench(props: Props) {
         }
     };
 
+    const shotCanQueryProvider = shotTask?.status === "failed" && Boolean(shotTask?.providerRequestId);
+    // 失败任务可能因 create 阶段返回的泛化错误而隐藏了真实原因；有上游 ID 时先尝试
+    // 回查确认上游是否其实已生成，能查到则直接恢复，避免盲目重试造成重复扣费。
+    const [recoveringShotId, setRecoveringShotId] = useState("");
+    const recoverShotTask = async () => {
+        const target = shotTask;
+        if (!target || !selectedShot) return;
+        setRecoveringShotId(target.id);
+        try {
+            const result = await queryFailedVideoProviderTask(target.id);
+            await onRefresh();
+            if (result.recovered) {
+                message.success("已确认上游生成成功并恢复本任务结果");
+            } else {
+                message.info(result.providerStatus ? `上游任务仍在处理（${result.providerStatus}），可稍后再试` : "上游任务仍在处理，可稍后再试");
+            }
+        } catch (error) {
+            message.error(error instanceof Error ? generationErrorMessage(error.message) : "查询上游任务失败");
+        } finally {
+            setRecoveringShotId("");
+        }
+    };
+
     const stageCopy = productionStageCopy[activeStage as "storyboard" | "previz" | "video"];
     const selectedShotSubmitting = submittingShotIds.has(selectedShot?.id || "");
 
@@ -547,7 +572,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                             <div className="workflow-generation-cost" aria-live="polite">
                                 {creditsEnabled && formattedGenerationCredits ? <><CreditSymbol /><span>本次预计 {formattedGenerationCredits} 积分</span></> : creditsEnabled && routedModel ? <span>本次费用将在提交时按实际规格计算</span> : null}
                             </div>
-                            <div className="flex items-center gap-2"><Button danger icon={<Trash2 className="size-4" />} loading={deleteShot.isPending} disabled={saveShot.isPending || selectedShotSubmitting || changeAssetBinding.isPending} onClick={requestDeleteShot}>删除镜头</Button><Button htmlType="submit" icon={<Save className="size-4" />} loading={saveShot.isPending} disabled={!editorDirty || deleteShot.isPending}>保存脚本</Button><Button type="primary" icon={<Play className="size-4" />} loading={selectedShotSubmitting || shotTask?.status === "queued" || shotTask?.status === "running"} disabled={deleteShot.isPending} onClick={() => void generateArtifact()}>{selectedShotSubmitting ? `${stageCopy.action}（正在提交）` : shotTask?.status === "queued" || shotTask?.status === "running" ? `${stageCopy.action}（已运行${shotTaskElapsed}）` : shotTask?.status === "failed" ? `${stageCopy.action}（上次失败，可重试）` : shotTask?.status === "succeeded" && !newestArtifact ? `${stageCopy.action}（已完成，正在同步）` : newestArtifact ? `${stageCopy.action}（已生成）` : stageCopy.action}</Button></div>
+                            <div className="flex items-center gap-2"><Button danger icon={<Trash2 className="size-4" />} loading={deleteShot.isPending} disabled={saveShot.isPending || selectedShotSubmitting || changeAssetBinding.isPending} onClick={requestDeleteShot}>删除镜头</Button><Button htmlType="submit" icon={<Save className="size-4" />} loading={saveShot.isPending} disabled={!editorDirty || deleteShot.isPending}>保存脚本</Button>{shotCanQueryProvider ? <Tooltip title={shotTask?.error ? `失败原因：${generationErrorMessage(shotTask.error)}` : "任务已失败，可回查上游是否实际已生成"}><Button icon={<RefreshCw className="size-4" />} loading={recoveringShotId === shotTask?.id} disabled={selectedShotSubmitting} onClick={() => void recoverShotTask()}>查询上游</Button></Tooltip> : null}<Button type="primary" icon={<Play className="size-4" />} loading={selectedShotSubmitting || shotTask?.status === "queued" || shotTask?.status === "running"} disabled={deleteShot.isPending} onClick={() => void generateArtifact()}>{selectedShotSubmitting ? `${stageCopy.action}（正在提交）` : shotTask?.status === "queued" || shotTask?.status === "running" ? `${stageCopy.action}（已运行${shotTaskElapsed}）` : shotTask?.status === "failed" ? `${stageCopy.action}（上次失败，可重试）` : shotTask?.status === "succeeded" && !newestArtifact ? `${stageCopy.action}（已完成，正在同步）` : newestArtifact ? `${stageCopy.action}（已生成）` : stageCopy.action}</Button></div>
                         </footer>
                     </Form>
                 </section>

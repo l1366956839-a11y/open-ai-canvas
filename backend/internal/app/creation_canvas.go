@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -480,7 +481,9 @@ func validateCreationResultMetadata(repo *repository.Repository, userID, runID, 
 			continue
 		}
 		var request CreateTaskRequest
-		_ = json.Unmarshal([]byte(item.RequestJSON), &request)
+		if err := json.Unmarshal([]byte(item.RequestJSON), &request); err != nil {
+			kernel.LogJSONDecodeFailure("app.item.RequestJSON", err, item.RequestJSON)
+		}
 		if stringValue(request.Input["nodeId"]) == nodeID {
 			found = true
 			break

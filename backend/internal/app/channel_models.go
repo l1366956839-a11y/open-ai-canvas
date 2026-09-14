@@ -1,6 +1,7 @@
 package app
 
 import (
+	"infinite-canvas/backend/internal/kernel"
 	"context"
 	"encoding/json"
 	"errors"
@@ -945,7 +946,9 @@ func (s *Service) syncInitialChannelModels(channel *model.ModelChannel, names []
 
 func retiredChannelModelKeys(raw string) map[string]bool {
 	var values []string
-	_ = json.Unmarshal([]byte(raw), &values)
+	if err := json.Unmarshal([]byte(raw), &values); err != nil {
+		kernel.LogJSONDecodeFailure("channel_models.retiredChannelModelKeys", err, raw)
+	}
 	result := make(map[string]bool, len(values))
 	for _, value := range values {
 		if key := channelModelCatalogKey(value); key != "" {
